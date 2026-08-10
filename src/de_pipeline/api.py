@@ -33,6 +33,9 @@ Docs:
 from __future__ import annotations
 
 import httpx
+from tenacity import retry, retry_if_exception_type, stop_after_attempt
+
+from de_pipeline.config import settings
 
 USER_AGENT = "nss-intro-to-de/week-3"
 DEFAULT_TIMEOUT = httpx.Timeout(10.0)
@@ -78,7 +81,19 @@ def build_client(
     won't use it in normal runs — it's the injection point the tests use to drive
     your client with a fake transport instead of the network.
     """
-    raise NotImplementedError("Day 1: build the httpx client (with auth wired)")
+    base_url = base_url if base_url is not None else settings.api_base_url
+    token = token if token is not None else settings.api_token
+
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    return httpx.Client(
+        base_url=base_url,
+        headers=headers,
+        timeout=DEFAULT_TIMEOUT,
+        transport=transport,
+    )
 
 
 def fetch_page(page: int = 1, *, client: httpx.Client | None = None) -> dict:
@@ -98,7 +113,33 @@ def fetch_page(page: int = 1, *, client: httpx.Client | None = None) -> dict:
     4s, ... capped). Tip: a custom ``wait`` callable receives the retry state, so
     it can pull ``retry_after`` off the raised ``RateLimitError``.
     """
-    raise NotImplementedError("Day 1: GET one page; Day 2: add 429 retry/backoff")
+
+    def _wait(retry_state) -> float:
+        exc = retry_state.outcome.exception()
+        if isinstance(exc, RateLimitError) and exc.retry_after is not None:
+            return exc.retry_after
+        return min(2 ** (retry_state.attempt_number - 1), 30.0)
+
+    @retry(
+        retry=retry_if_exception_type((RateLimitError, httpx.TransportError)),
+        stop=stop_after_attempt(MAX_ATTEMPTS),
+        wait=_wait,
+    )
+    def _fetch() -> dict:
+        owns_client = client is None
+        active_client = build_client() if owns_client else client
+        try:
+            response = active_client.get("/character", params={"page": page})
+            if response.status_code == 429:
+                retry_after = response.headers.get("Retry-After")
+                raise RateLimitError(float(retry_after) if retry_after is not None else None)
+            response.raise_for_status()
+            return response.json()
+        finally:
+            if owns_client:
+                active_client.close()
+
+    return _fetch()
 
 
 # --------------------------------------------------------------------------- #
