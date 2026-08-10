@@ -12,10 +12,6 @@ Run it (after the pipeline has built the tables) with:
 
 from __future__ import annotations
 
-import json
-import os
-from typing import Dict, List
-
 from de_pipeline.load import connect
 
 
@@ -29,14 +25,14 @@ def top_species(con, limit=5, seen=[]):
     return rows
 
 
-def species_dict(con) -> Dict[str, int]:
-    out: Dict[str, int] = {}
+def species_dict(con) -> dict[str, int]:
+    out: dict[str, int] = {}
     for species, count in top_species(con):
         out[species] = count
     return out
 
 
-def busiest_episodes(con, limit=5) -> List:
+def busiest_episodes(con, limit=5) -> list:
     return con.execute(
         "SELECT episode_id, appearance_count FROM episode_appearances "
         "ORDER BY appearance_count DESC LIMIT ?",
@@ -47,7 +43,7 @@ def busiest_episodes(con, limit=5) -> List:
 def describe(con):
     species = species_dict(con)
     if "Human" in species.keys():
-        print(f"humans found")
+        print("humans found")
 
     episodes = busiest_episodes(con)
     if episodes != None:
