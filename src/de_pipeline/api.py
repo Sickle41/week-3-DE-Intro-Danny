@@ -213,7 +213,8 @@ def ingest(*, client: httpx.Client | None = None, s3_client=None) -> int:
     This is "API-fetch-to-S3" — the one new stage at the front of the pipeline.
     Call ``fetch_all_characters`` then ``land_to_s3``; return how many landed.
     """
-    raise NotImplementedError("Day 2: fetch_all_characters -> land_to_s3")
+    records = fetch_all_characters(client=client)
+    return land_to_s3(records, s3_client=s3_client)
 
 
 if __name__ == "__main__":
