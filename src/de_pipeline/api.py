@@ -34,6 +34,8 @@ from __future__ import annotations
 
 import httpx
 
+from de_pipeline.config import settings
+
 USER_AGENT = "nss-intro-to-de/week-3"
 DEFAULT_TIMEOUT = httpx.Timeout(10.0)
 MAX_ATTEMPTS = 5
@@ -78,7 +80,19 @@ def build_client(
     won't use it in normal runs — it's the injection point the tests use to drive
     your client with a fake transport instead of the network.
     """
-    raise NotImplementedError("Day 1: build the httpx client (with auth wired)")
+    base_url = base_url if base_url is not None else settings.api_base_url
+    token = token if token is not None else settings.api_token
+
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    return httpx.Client(
+        base_url=base_url,
+        headers=headers,
+        timeout=DEFAULT_TIMEOUT,
+        transport=transport,
+    )
 
 
 def fetch_page(page: int = 1, *, client: httpx.Client | None = None) -> dict:
