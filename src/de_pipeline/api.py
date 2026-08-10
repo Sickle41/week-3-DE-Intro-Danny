@@ -158,7 +158,20 @@ def fetch_all_characters(*, client: httpx.Client | None = None) -> list[dict]:
     across pages (pass it into ``fetch_page``) so you're not paying connection
     setup on every request.
     """
-    raise NotImplementedError("Day 2: paginate until info.next is null")
+    owns_client = client is None
+    active_client = build_client() if owns_client else client
+    try:
+        results: list[dict] = []
+        page = 1
+        while True:
+            data = fetch_page(page, client=active_client)
+            results.extend(data["results"])
+            if not data["info"]["next"]:
+                return results
+            page += 1
+    finally:
+        if owns_client:
+            active_client.close()
 
 
 # --------------------------------------------------------------------------- #
