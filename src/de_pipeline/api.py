@@ -32,12 +32,12 @@ Docs:
 
 from __future__ import annotations
 
+import json
+
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt
 
-from de_pipeline.config import settings
-
-from de_pipeline.config import settings
+from de_pipeline.config import get_s3_client, settings
 
 USER_AGENT = "nss-intro-to-de/week-3"
 DEFAULT_TIMEOUT = httpx.Timeout(10.0)
@@ -181,7 +181,17 @@ def land_to_s3(records: list[dict], *, s3_client=None, key: str | None = None) -
 
     Land it RAW — don't clean or reshape here; that's transform.py's job.
     """
-    raise NotImplementedError("Day 1/2: put the raw JSON array to S3")
+    s3_client = s3_client if s3_client is not None else get_s3_client()
+    key = key if key is not None else settings.characters_key
+
+    try:
+        s3_client.head_bucket(Bucket=settings.bucket)
+    except Exception:
+        s3_client.create_bucket(Bucket=settings.bucket)
+
+    body = json.dumps(records).encode("utf-8")
+    s3_client.put_object(Bucket=settings.bucket, Key=key, Body=body)
+    return len(records)
 
 
 def ingest(*, client: httpx.Client | None = None, s3_client=None) -> int:
